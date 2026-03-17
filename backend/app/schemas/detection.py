@@ -7,13 +7,11 @@ from pydantic import BaseModel, Field
 
 
 DetectionStatus = Literal["pending", "processing", "done", "failed"]
-SeverityLevel = Literal["low", "medium", "high"]
 
 
 class DetectionRegion(BaseModel):
     label: str
     confidence: float = Field(ge=0.0, le=1.0)
-    severity: SeverityLevel = "medium"
     bbox: tuple[float, float, float, float]
 
 
@@ -36,11 +34,9 @@ class DetectionTaskItem(BaseModel):
     imageSignedUrl: str | None = None
     processedImagePath: str | None = None
     processedImageSignedUrl: str | None = None
-    thumbnailPath: str | None = None
     summary: str | None = None
     stainDetected: bool | None = None
     stainType: str | None = None
-    severityLevel: int | None = None
     affectedAreaPercentage: float | None = None
     regions: list[DetectionRegion] = []
     metrics: DetectionMetrics | None = None

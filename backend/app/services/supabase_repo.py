@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 from fastapi import HTTPException
@@ -16,12 +16,12 @@ class SupabaseRepository:
             raise RuntimeError("Supabase configuration is missing")
         self.client: Client = create_client(settings.supabase_url, key)
 
-    def upload_image(self, user_id: str, task_id: str, image_bytes: bytes, content_type: str) -> str:
+    def upload_image(self, user_id: str, image_bytes: bytes, content_type: str) -> str:
         suffix = ".jpg" if content_type.endswith("jpeg") else ".png"
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now()
+        ym = f"{now.year:04d}{now.month:02d}"
         path = (
-            f"user/{user_id}/task/{task_id}/original/"
-            f"{now.year:04d}/{now.month:02d}/{uuid.uuid4().hex}{suffix}"
+            f"u/{user_id}/o/{ym}/{uuid.uuid4().hex[:16]}{suffix}"
         )
 
         storage = self.client.storage.from_(settings.supabase_bucket)
@@ -30,10 +30,10 @@ class SupabaseRepository:
 
     def upload_processed_image(self, user_id: str, task_id: str, image_bytes: bytes, content_type: str) -> str:
         suffix = ".png" if content_type.endswith("png") else ".jpg"
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now()
+        ym = f"{now.year:04d}{now.month:02d}"
         path = (
-            f"user/{user_id}/task/{task_id}/processed/"
-            f"{now.year:04d}/{now.month:02d}/{uuid.uuid4().hex}{suffix}"
+            f"u/{user_id}/p/{ym}/{task_id}-{uuid.uuid4().hex[:10]}{suffix}"
         )
 
         storage = self.client.storage.from_(settings.supabase_bucket)
@@ -75,13 +75,10 @@ class SupabaseRepository:
             return response.get("signedURL") or response.get("signedUrl") or response.get("signed_url")
         return None
 
-    def create_detection(self, task_id: str, user_id: str, payload: dict, image_path: str, file_size: int, mime_type: str) -> str:
-        result_id = str(uuid.uuid4())
-        image_id = str(uuid.uuid4())
-        now = datetime.now(tz=timezone.utc).isoformat()
+    def create_detection(self, user_id: str, payload: dict, image_path: str, file_size: int, mime_type: str) -> str:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        self.client.table("inspection_tasks").insert({
-            "id": task_id,
+        task_insert = self.client.table("inspection_tasks").insert({
             "user_id": user_id,
             "building_name": payload["building_name"],
             "location_floor": payload.get("location_floor"),
@@ -92,8 +89,11 @@ class SupabaseRepository:
             "updated_at": now
         }).execute()
 
+        if not task_insert.data:
+            raise RuntimeError("Failed to create task")
+        task_id = str(task_insert.data[0]["id"])
+
         self.client.table("task_images").insert({
-            "id": image_id,
             "task_id": task_id,
             "user_id": user_id,
             "original_image_path": image_path,
@@ -103,11 +103,8 @@ class SupabaseRepository:
         }).execute()
 
         self.client.table("detection_results").insert({
-            "id": result_id,
             "task_id": task_id,
             "user_id": user_id,
-            "model_name": "stain-detector",
-            "model_version": "v0.1.0",
             "status": "pending",
             "created_at": now,
             "updated_at": now
@@ -116,7 +113,7 @@ class SupabaseRepository:
         return task_id
 
     def update_detection_processing(self, task_id: str) -> None:
-        now = datetime.now(tz=timezone.utc).isoformat()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.client.table("inspection_tasks").update({
             "status": "processing",
             "updated_at": now
@@ -128,7 +125,7 @@ class SupabaseRepository:
         }).eq("task_id", task_id).execute()
 
     def update_detection_done(self, task_id: str, result: dict) -> None:
-        now = datetime.now(tz=timezone.utc).isoformat()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         owner_res = self.client.table("inspection_tasks").select("user_id").eq("id", task_id).limit(1).execute()
         if not owner_res.data:
@@ -153,7 +150,6 @@ class SupabaseRepository:
             "summary": result["summary"],
             "stain_detected": result["stain_detected"],
             "stain_type": result["stain_type"],
-            "severity_level": result["severity_level"],
             "affected_area_percentage": result["affected_area_percentage"],
             "updated_at": now
         }).eq("id", task_id).execute()
@@ -176,7 +172,6 @@ class SupabaseRepository:
                     "task_id": task_id,
                     "label": region["label"],
                     "confidence": region["confidence"],
-                    "severity": region["severity"],
                     "x1": region["bbox"][0],
                     "y1": region["bbox"][1],
                     "x2": region["bbox"][2],
@@ -186,7 +181,7 @@ class SupabaseRepository:
             ]).execute()
 
     def update_detection_failed(self, task_id: str, error_message: str) -> None:
-        now = datetime.now(tz=timezone.utc).isoformat()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         self.client.table("inspection_tasks").update({
             "status": "failed",
@@ -226,12 +221,11 @@ class SupabaseRepository:
         result_res = self.client.table("detection_results").select("metrics").eq("task_id", task_id).eq("user_id", user_id).limit(1).execute()
         metrics = result_res.data[0]["metrics"] if result_res.data else None
 
-        regions_res = self.client.table("result_regions").select("label, confidence, severity, x1, y1, x2, y2").eq("task_id", task_id).execute()
+        regions_res = self.client.table("result_regions").select("label, confidence, x1, y1, x2, y2").eq("task_id", task_id).execute()
         regions = [
             {
                 "label": row["label"],
                 "confidence": row["confidence"],
-                "severity": row["severity"],
                 "bbox": [row["x1"], row["y1"], row["x2"], row["y2"]]
             }
             for row in regions_res.data or []
@@ -251,11 +245,9 @@ class SupabaseRepository:
             "imageSignedUrl": image_signed_url,
             "processedImagePath": processed_image_path,
             "processedImageSignedUrl": processed_image_signed_url,
-            "thumbnailPath": None,
             "summary": task.get("summary"),
             "stainDetected": task.get("stain_detected"),
             "stainType": task.get("stain_type"),
-            "severityLevel": task.get("severity_level"),
             "affectedAreaPercentage": task.get("affected_area_percentage"),
             "regions": regions,
             "metrics": metrics,
@@ -274,19 +266,59 @@ class SupabaseRepository:
 
         return str(image_path), str(mime_type)
 
-    def list_tasks(self, user_id: str, current_page: int, size: int, status: str | None, building_name: str | None) -> dict:
+    def list_tasks(
+        self,
+        user_id: str,
+        current_page: int,
+        size: int,
+        status: str | None,
+        building_name: str | None,
+        start_time: str | None,
+        end_time: str | None
+    ) -> dict:
         start = (current_page - 1) * size
         end = start + size - 1
 
-        query = self.client.table("inspection_tasks").select("*", count="exact").eq("user_id", user_id)
+        query = self.client.table("inspection_tasks").select(
+            "id,user_id,building_name,location_floor,location_section,status,created_at,updated_at,summary,stain_detected,stain_type,affected_area_percentage,error_message",
+            count="exact"
+        ).eq("user_id", user_id)
         if status:
             query = query.eq("status", status)
         if building_name:
             query = query.ilike("building_name", f"%{building_name}%")
+        if start_time:
+            query = query.gte("created_at", start_time)
+        if end_time:
+            query = query.lte("created_at", end_time)
 
-        response = query.order("created_at", desc=True).range(start, end).execute()
+        response = query.order("created_at", desc=True).order("id", desc=True).range(start, end).execute()
 
-        items = [self.get_task_detail(task["id"], user_id) for task in response.data or []]
+        items = [
+            {
+                "id": task["id"],
+                "userId": task["user_id"],
+                "buildingName": task["building_name"],
+                "locationFloor": task.get("location_floor"),
+                "locationSection": task.get("location_section"),
+                "description": None,
+                "status": task["status"],
+                "createdAt": task["created_at"],
+                "updatedAt": task["updated_at"],
+                "imagePath": None,
+                "imageSignedUrl": None,
+                "processedImagePath": None,
+                "processedImageSignedUrl": None,
+                "summary": task.get("summary"),
+                "stainDetected": task.get("stain_detected"),
+                "stainType": task.get("stain_type"),
+                "affectedAreaPercentage": task.get("affected_area_percentage"),
+                "regions": [],
+                "metrics": None,
+                "errorMessage": task.get("error_message")
+            }
+            for task in response.data or []
+        ]
         return {
             "list": items,
             "total": response.count or 0
@@ -297,7 +329,7 @@ class SupabaseRepository:
         if task["status"] not in ("failed", "done"):
             return
 
-        now = datetime.now(tz=timezone.utc).isoformat()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.client.table("inspection_tasks").update({
             "status": "pending",
             "error_message": None,

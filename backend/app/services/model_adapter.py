@@ -16,7 +16,6 @@ from app.core.config import settings
 class ModelResultRegion:
     label: str
     confidence: float
-    severity: str
     bbox: tuple[float, float, float, float]
 
 
@@ -24,7 +23,6 @@ class ModelResultRegion:
 class ModelResult:
     stain_detected: bool
     stain_type: str | None
-    severity_level: int | None
     affected_area_percentage: float | None
     summary: str
     runtime_ms: int
@@ -51,14 +49,6 @@ def _load_model() -> YOLO:
 
     _model = YOLO(model_path)
     return _model
-
-
-def _severity_from_confidence(confidence: float) -> str:
-    if confidence >= 0.8:
-        return "high"
-    if confidence >= 0.55:
-        return "medium"
-    return "low"
 
 
 def detect_image_sync(image_bytes: bytes, content_type: str) -> ModelResult:
@@ -110,7 +100,6 @@ def detect_image_sync(image_bytes: bytes, content_type: str) -> ModelResult:
                 ModelResultRegion(
                     label=label,
                     confidence=round(conf_value, 4),
-                    severity=_severity_from_confidence(conf_value),
                     bbox=(round(x1, 5), round(y1, 5), round(x2, 5), round(y2, 5))
                 )
             )
@@ -138,17 +127,14 @@ def detect_image_sync(image_bytes: bytes, content_type: str) -> ModelResult:
 
     if stain_detected:
         stain_type = best_label
-        severity_level = 5 if affected_area >= 45 else 4 if affected_area >= 30 else 3 if affected_area >= 15 else 2
         summary = f"检测到 {len(regions)} 处疑似污渍，主要类型为 {stain_type}，污渍占比约 {affected_area}% 。"
     else:
         stain_type = None
-        severity_level = None
         summary = "未检测到明显污渍。"
 
     return ModelResult(
         stain_detected=stain_detected,
         stain_type=stain_type,
-        severity_level=severity_level,
         affected_area_percentage=affected_area,
         summary=summary,
         runtime_ms=runtime_ms,

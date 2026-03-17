@@ -12,7 +12,6 @@ def process_detection_task(task_id: str, image_bytes: bytes, content_type: str) 
         repo.update_detection_done(task_id, {
             "stain_detected": model_result.stain_detected,
             "stain_type": model_result.stain_type,
-            "severity_level": model_result.severity_level,
             "affected_area_percentage": model_result.affected_area_percentage,
             "summary": model_result.summary,
             "runtime_ms": model_result.runtime_ms,
@@ -23,7 +22,6 @@ def process_detection_task(task_id: str, image_bytes: bytes, content_type: str) 
                 {
                     "label": item.label,
                     "confidence": item.confidence,
-                    "severity": item.severity,
                     "bbox": item.bbox
                 }
                 for item in model_result.regions

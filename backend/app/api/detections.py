@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import uuid
-
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, UploadFile
 
 from app.core.auth import get_current_user_id
@@ -51,10 +49,8 @@ async def create_detection(
         return error_response
     assert repo is not None
     try:
-        task_id = str(uuid.uuid4())
-        image_path = repo.upload_image(user_id, task_id, image_bytes, image.content_type)
+        image_path = repo.upload_image(user_id, image_bytes, image.content_type)
         task_id = repo.create_detection(
-            task_id=task_id,
             user_id=user_id,
             payload={
                 "building_name": building_name,
@@ -73,7 +69,6 @@ async def create_detection(
             repo.update_detection_done(task_id, {
                 "stain_detected": model_result.stain_detected,
                 "stain_type": model_result.stain_type,
-                "severity_level": model_result.severity_level,
                 "affected_area_percentage": model_result.affected_area_percentage,
                 "summary": model_result.summary,
                 "runtime_ms": model_result.runtime_ms,
@@ -84,7 +79,6 @@ async def create_detection(
                     {
                         "label": item.label,
                         "confidence": item.confidence,
-                        "severity": item.severity,
                         "bbox": item.bbox
                     }
                     for item in model_result.regions
@@ -104,14 +98,16 @@ def list_detections(
     current_page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
     status: str | None = Query(None),
-    building_name: str | None = Query(None)
+    building_name: str | None = Query(None),
+    start_time: str | None = Query(None),
+    end_time: str | None = Query(None)
 ) -> dict:
     repo, error_response = _get_repo_or_fail()
     if error_response:
         return error_response
     assert repo is not None
     try:
-        data = repo.list_tasks(user_id, current_page, size, status, building_name)
+        data = repo.list_tasks(user_id, current_page, size, status, building_name, start_time, end_time)
         return ok(data)
     except Exception as error:  # noqa: BLE001
         return fail(f"Query detections failed: {error}", 500)

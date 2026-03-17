@@ -1,9 +1,31 @@
--- Enable extension
-create extension if not exists pgcrypto;
+-- Final detection-domain schema (bigint + timestamp)
+-- Idempotent: safe to run multiple times
 
--- Core task table
+create extension if not exists pg_trgm;
+
+-- Drop policies first for idempotent re-run
+DROP POLICY IF EXISTS "inspection_tasks_owner_select" ON public.inspection_tasks;
+DROP POLICY IF EXISTS "inspection_tasks_owner_insert" ON public.inspection_tasks;
+DROP POLICY IF EXISTS "inspection_tasks_owner_update" ON public.inspection_tasks;
+
+DROP POLICY IF EXISTS "task_images_owner_select" ON public.task_images;
+DROP POLICY IF EXISTS "task_images_owner_insert" ON public.task_images;
+DROP POLICY IF EXISTS "task_images_owner_update" ON public.task_images;
+
+DROP POLICY IF EXISTS "detection_results_owner_select" ON public.detection_results;
+DROP POLICY IF EXISTS "detection_results_owner_insert" ON public.detection_results;
+DROP POLICY IF EXISTS "detection_results_owner_update" ON public.detection_results;
+
+DROP POLICY IF EXISTS "result_regions_owner_select" ON public.result_regions;
+DROP POLICY IF EXISTS "result_regions_owner_insert" ON public.result_regions;
+DROP POLICY IF EXISTS "result_regions_owner_update" ON public.result_regions;
+
+-- Remove obsolete table if still exists
+drop table if exists public.operation_logs cascade;
+
+-- Tables
 create table if not exists public.inspection_tasks (
-  id uuid primary key default gen_random_uuid(),
+  id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   building_name text not null,
   location_floor int,
@@ -13,84 +35,84 @@ create table if not exists public.inspection_tasks (
   summary text,
   stain_detected boolean,
   stain_type text,
-  severity_level int,
   affected_area_percentage numeric(6, 2),
   error_message text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  created_at timestamp not null default current_timestamp,
+  updated_at timestamp not null default current_timestamp
 );
 
-create index if not exists idx_inspection_tasks_user_created
-  on public.inspection_tasks(user_id, created_at desc);
-
-create index if not exists idx_inspection_tasks_status
-  on public.inspection_tasks(status);
-
 create table if not exists public.task_images (
-  id uuid primary key default gen_random_uuid(),
-  task_id uuid not null references public.inspection_tasks(id) on delete cascade,
+  id bigint generated always as identity primary key,
+  task_id bigint not null references public.inspection_tasks(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   original_image_path text not null,
   processed_image_path text,
-  thumbnail_path text,
   mime_type text,
   file_size bigint,
-  image_width int,
-  image_height int,
-  created_at timestamptz not null default now()
+  created_at timestamp not null default current_timestamp
 );
 
-create index if not exists idx_task_images_task_id on public.task_images(task_id);
-create index if not exists idx_task_images_user_id on public.task_images(user_id);
-
 create table if not exists public.detection_results (
-  id uuid primary key default gen_random_uuid(),
-  task_id uuid not null references public.inspection_tasks(id) on delete cascade,
+  id bigint generated always as identity primary key,
+  task_id bigint not null references public.inspection_tasks(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  model_name text not null,
-  model_version text not null,
   status text not null default 'pending' check (status in ('pending', 'processing', 'done', 'failed')),
   summary text,
   metrics jsonb,
   error_message text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  processed_at timestamptz
+  created_at timestamp not null default current_timestamp,
+  updated_at timestamp not null default current_timestamp,
+  processed_at timestamp
 );
 
-create unique index if not exists uq_detection_results_task_id on public.detection_results(task_id);
-
 create table if not exists public.result_regions (
-  id uuid primary key default gen_random_uuid(),
-  task_id uuid not null references public.inspection_tasks(id) on delete cascade,
+  id bigint generated always as identity primary key,
+  task_id bigint not null references public.inspection_tasks(id) on delete cascade,
   label text not null,
   confidence numeric(5, 4) not null,
-  severity text not null,
   x1 numeric(8, 5) not null,
   y1 numeric(8, 5) not null,
   x2 numeric(8, 5) not null,
   y2 numeric(8, 5) not null,
-  created_at timestamptz not null default now()
+  created_at timestamp not null default current_timestamp
 );
+
+-- Incremental cleanup for existing databases
+alter table if exists public.result_regions
+  drop column if exists severity;
+
+alter table if exists public.task_images
+  drop column if exists thumbnail_path,
+  drop column if exists image_width,
+  drop column if exists image_height;
+
+-- Indexes
+create index if not exists idx_inspection_tasks_user_created
+  on public.inspection_tasks(user_id, created_at desc);
+
+create index if not exists idx_inspection_tasks_user_status_created
+  on public.inspection_tasks(user_id, status, created_at desc);
+
+create index if not exists idx_inspection_tasks_status
+  on public.inspection_tasks(status);
+
+create index if not exists idx_inspection_tasks_building_name_trgm
+  on public.inspection_tasks using gin (building_name gin_trgm_ops);
+
+create index if not exists idx_task_images_task_id on public.task_images(task_id);
+create index if not exists idx_task_images_user_id on public.task_images(user_id);
+
+create unique index if not exists uq_detection_results_task_id on public.detection_results(task_id);
 
 create index if not exists idx_result_regions_task_id on public.result_regions(task_id);
-
-create table if not exists public.operation_logs (
-  id uuid primary key default gen_random_uuid(),
-  task_id uuid references public.inspection_tasks(id) on delete set null,
-  user_id uuid references auth.users(id) on delete set null,
-  action text not null,
-  detail jsonb,
-  created_at timestamptz not null default now()
-);
 
 -- RLS
 alter table public.inspection_tasks enable row level security;
 alter table public.task_images enable row level security;
 alter table public.detection_results enable row level security;
 alter table public.result_regions enable row level security;
-alter table public.operation_logs enable row level security;
 
+-- Policies
 create policy "inspection_tasks_owner_select"
   on public.inspection_tasks
   for select
@@ -170,43 +192,4 @@ create policy "result_regions_owner_update"
       where t.id = result_regions.task_id
         and t.user_id = auth.uid()
     )
-  );
-
-create policy "operation_logs_owner_select"
-  on public.operation_logs
-  for select
-  using (auth.uid() = user_id);
-
-create policy "operation_logs_owner_insert"
-  on public.operation_logs
-  for insert
-  with check (auth.uid() = user_id);
-
--- Storage bucket and policies
-insert into storage.buckets (id, name, public)
-values ('stain-images', 'stain-images', false)
-on conflict (id) do nothing;
-
-create policy "storage_owner_select"
-  on storage.objects
-  for select
-  using (
-    bucket_id = 'stain-images'
-    and (storage.foldername(name))[2] = auth.uid()::text
-  );
-
-create policy "storage_owner_insert"
-  on storage.objects
-  for insert
-  with check (
-    bucket_id = 'stain-images'
-    and (storage.foldername(name))[2] = auth.uid()::text
-  );
-
-create policy "storage_owner_update"
-  on storage.objects
-  for update
-  using (
-    bucket_id = 'stain-images'
-    and (storage.foldername(name))[2] = auth.uid()::text
   );

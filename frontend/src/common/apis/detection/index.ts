@@ -39,7 +39,7 @@ export function createDetectionTaskApi(
   })
 }
 
-export function getDetectionTaskApi(id: string) {
+export function getDetectionTaskApi(id: string | number) {
   return request<Detection.DetectionTaskItem>({
     url: `detections/${id}`,
     method: "get"
@@ -54,19 +54,21 @@ export function getDetectionListApi(params: Detection.DetectionListQuery) {
       current_page: params.currentPage,
       size: params.size,
       status: params.status,
-      building_name: params.buildingName
+      building_name: params.buildingName,
+      start_time: params.startTime,
+      end_time: params.endTime
     }
   })
 }
 
-export function retryDetectionTaskApi(id: string) {
+export function retryDetectionTaskApi(id: string | number) {
   return request<Detection.RetryDetectionData>({
     url: `detections/${id}/retry`,
     method: "post"
   })
 }
 
-export function getDetectionSignedUrlApi(id: string, expiresIn = 3600) {
+export function getDetectionSignedUrlApi(id: string | number, expiresIn = 3600) {
   return request<Detection.DetectionSignedUrlData>({
     url: `detections/${id}/signed-url`,
     method: "get",

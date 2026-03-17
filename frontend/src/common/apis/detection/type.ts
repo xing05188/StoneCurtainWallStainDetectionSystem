@@ -3,7 +3,6 @@ export type DetectionStatus = "pending" | "processing" | "done" | "failed"
 export interface DetectionRegion {
   label: string
   confidence: number
-  severity: "low" | "medium" | "high"
   bbox: [number, number, number, number]
 }
 
@@ -13,7 +12,7 @@ export interface DetectionMetrics {
 }
 
 export interface DetectionTaskItem {
-  id: string
+  id: string | number
   userId: string
   buildingName: string
   locationFloor?: number | null
@@ -26,11 +25,9 @@ export interface DetectionTaskItem {
   imageSignedUrl?: string | null
   processedImagePath?: string | null
   processedImageSignedUrl?: string | null
-  thumbnailPath?: string | null
   summary?: string | null
   stainDetected?: boolean | null
   stainType?: string | null
-  severityLevel?: number | null
   affectedAreaPercentage?: number | null
   regions?: DetectionRegion[]
   metrics?: DetectionMetrics | null
@@ -49,6 +46,8 @@ export interface DetectionListQuery {
   size: number
   status?: DetectionStatus
   buildingName?: string
+  startTime?: string
+  endTime?: string
 }
 
 export interface DetectionListData {
@@ -57,12 +56,12 @@ export interface DetectionListData {
 }
 
 export interface RetryDetectionData {
-  id: string
+  id: string | number
   status: DetectionStatus
 }
 
 export interface DetectionSignedUrlData {
-  id: string
+  id: string | number
   imagePath: string
   imageSignedUrl: string | null
   expiresIn: number

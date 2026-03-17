@@ -57,7 +57,7 @@ export const useDetectionStore = defineStore("detection", () => {
     }
   }
 
-  const fetchTask = async (id: string) => {
+  const fetchTask = async (id: string | number) => {
     const record = await getDetectionTaskApi(id)
     if (!record.imageSignedUrl && record.imagePath) {
       try {
@@ -71,7 +71,7 @@ export const useDetectionStore = defineStore("detection", () => {
     return record
   }
 
-  const refreshTaskImageSignedUrl = async (id: string, expiresIn = 3600) => {
+  const refreshTaskImageSignedUrl = async (id: string | number, expiresIn = 3600) => {
     const signed = await getDetectionSignedUrlApi(id, expiresIn)
     if (currentTask.value?.id === id) {
       currentTask.value.imageSignedUrl = signed.imageSignedUrl
@@ -79,7 +79,7 @@ export const useDetectionStore = defineStore("detection", () => {
     return signed
   }
 
-  const startPolling = (id: string) => {
+  const startPolling = (id: string | number) => {
     stopPolling()
     pollingTimer = window.setInterval(async () => {
       const task = await fetchTask(id)
@@ -90,10 +90,11 @@ export const useDetectionStore = defineStore("detection", () => {
     }, 2000)
   }
 
-  const createTask = async (file: File, payload: Detection.CreateDetectionPayload) => {
+  const createTask = async (file: File, payload: Detection.CreateDetectionPayload, onProgress?: (progress: number) => void) => {
     uploadProgress.value = 0
     const task = await createDetectionTaskApi(file, payload, (progress) => {
       uploadProgress.value = progress
+      onProgress?.(progress)
     })
 
     currentTask.value = task
@@ -106,7 +107,7 @@ export const useDetectionStore = defineStore("detection", () => {
     return task
   }
 
-  const retryTask = async (id: string) => {
+  const retryTask = async (id: string | number) => {
     const result = await retryDetectionTaskApi(id)
     await fetchTask(result.id)
     startPolling(result.id)

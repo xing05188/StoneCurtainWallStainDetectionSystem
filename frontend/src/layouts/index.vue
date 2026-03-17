@@ -35,7 +35,7 @@ watchEffect(() => {
 
 // 开启或关闭系统水印
 watchEffect(() => {
-  showWatermark.value ? setWatermark("Vue3 通用模板（示例）") : clearWatermark()
+  showWatermark.value ? setWatermark("石材幕墙污渍检测系统") : clearWatermark()
 })
 </script>
 
