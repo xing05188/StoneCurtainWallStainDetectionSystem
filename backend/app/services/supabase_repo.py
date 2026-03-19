@@ -96,6 +96,7 @@ class SupabaseRepository:
         self.client.table("task_images").insert({
             "task_id": task_id,
             "user_id": user_id,
+            "image_name": payload.get("image_name"),
             "original_image_path": image_path,
             "mime_type": mime_type,
             "file_size": file_size,
@@ -202,7 +203,8 @@ class SupabaseRepository:
 
         task = task_res.data[0]
 
-        image_res = self.client.table("task_images").select("original_image_path,processed_image_path").eq("task_id", task_id).eq("user_id", user_id).limit(1).execute()
+        image_res = self.client.table("task_images").select("image_name,original_image_path,processed_image_path").eq("task_id", task_id).eq("user_id", user_id).limit(1).execute()
+        image_name = image_res.data[0].get("image_name") if image_res.data else None
         image_path = image_res.data[0]["original_image_path"] if image_res.data else None
         processed_image_path = image_res.data[0].get("processed_image_path") if image_res.data else None
         image_signed_url = None
@@ -241,6 +243,7 @@ class SupabaseRepository:
             "status": task["status"],
             "createdAt": task["created_at"],
             "updatedAt": task["updated_at"],
+            "imageName": image_name,
             "imagePath": image_path,
             "imageSignedUrl": image_signed_url,
             "processedImagePath": processed_image_path,
@@ -294,6 +297,17 @@ class SupabaseRepository:
 
         response = query.order("created_at", desc=True).order("id", desc=True).range(start, end).execute()
 
+        task_rows = response.data or []
+        image_name_map: dict[str, str | None] = {}
+        for row in task_rows:
+            task_id = row["id"]
+            try:
+                image_row = self.client.table("task_images").select("image_name").eq("user_id", user_id).eq("task_id", task_id).order("id", desc=True).limit(1).execute()
+                image_name_map[str(task_id)] = image_row.data[0].get("image_name") if image_row.data else None
+            except Exception:  # noqa: BLE001
+                # 兼容尚未迁移 image_name 列的环境
+                image_name_map[str(task_id)] = None
+
         items = [
             {
                 "id": task["id"],
@@ -305,6 +319,7 @@ class SupabaseRepository:
                 "status": task["status"],
                 "createdAt": task["created_at"],
                 "updatedAt": task["updated_at"],
+                "imageName": image_name_map.get(str(task["id"])),
                 "imagePath": None,
                 "imageSignedUrl": None,
                 "processedImagePath": None,
@@ -317,7 +332,7 @@ class SupabaseRepository:
                 "metrics": None,
                 "errorMessage": task.get("error_message")
             }
-            for task in response.data or []
+            for task in task_rows
         ]
         return {
             "list": items,

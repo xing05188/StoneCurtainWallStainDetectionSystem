@@ -45,6 +45,7 @@ create table if not exists public.task_images (
   id bigint generated always as identity primary key,
   task_id bigint not null references public.inspection_tasks(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
+  image_name text,
   original_image_path text not null,
   processed_image_path text,
   mime_type text,
@@ -76,15 +77,6 @@ create table if not exists public.result_regions (
   y2 numeric(8, 5) not null,
   created_at timestamp not null default current_timestamp
 );
-
--- Incremental cleanup for existing databases
-alter table if exists public.result_regions
-  drop column if exists severity;
-
-alter table if exists public.task_images
-  drop column if exists thumbnail_path,
-  drop column if exists image_width,
-  drop column if exists image_height;
 
 -- Indexes
 create index if not exists idx_inspection_tasks_user_created

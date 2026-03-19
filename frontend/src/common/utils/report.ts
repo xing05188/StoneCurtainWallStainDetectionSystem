@@ -208,6 +208,7 @@ async function renderSingleTaskPage(task: DetectionTaskItem) {
 
   const fields: Array<[string, unknown]> = [
     ["任务ID", task.id],
+    ["图片名称", task.imageName],
     ["建筑", task.buildingName],
     ["楼层", task.locationFloor],
     ["分区", task.locationSection],

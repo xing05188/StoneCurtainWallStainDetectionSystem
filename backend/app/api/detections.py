@@ -56,7 +56,8 @@ async def create_detection(
                 "building_name": building_name,
                 "location_floor": location_floor,
                 "location_section": location_section,
-                "description": description
+                "description": description,
+                "image_name": image.filename
             },
             image_path=image_path,
             file_size=len(image_bytes),

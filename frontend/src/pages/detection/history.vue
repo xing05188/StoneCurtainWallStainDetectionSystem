@@ -20,6 +20,7 @@ const dateRange = ref<[string, string] | []>([])
 
 // 缓存机制（按查询参数 + 页码缓存，页面切换后仍可命中）
 const CACHE_DURATION = 15 * 60 * 1000 // 15分钟缓存
+const CACHE_VERSION = "v2-image-name"
 type HistoryCacheItem = {
   list: Detection.DetectionTaskItem[]
   total: number
@@ -36,6 +37,7 @@ function getHistoryCacheStore() {
 
 function getCacheKey() {
   return JSON.stringify({
+    v: CACHE_VERSION,
     currentPage: query.currentPage,
     size: query.size,
     status: query.status || "",
@@ -291,6 +293,7 @@ watch(detailVisible, (isVisible) => {
       <el-table v-loading="loading" :data="list" border @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" />
         <el-table-column prop="id" label="任务ID" width="80" />
+        <el-table-column prop="imageName" label="图片名称" min-width="60" />
         <el-table-column prop="buildingName" label="建筑" min-width="60" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
@@ -340,8 +343,11 @@ watch(detailVisible, (isVisible) => {
     <el-drawer v-model="detailVisible" title="检测详情" size="50%">
       <template v-if="historyDetailTask">
         <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="任务ID" :span="2">
+          <el-descriptions-item label="任务ID">
             {{ historyDetailTask.id }}
+          </el-descriptions-item>
+          <el-descriptions-item label="图片名称">
+            {{ historyDetailTask.imageName || "-" }}
           </el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag
@@ -420,6 +426,7 @@ watch(detailVisible, (isVisible) => {
               <el-image
                 v-if="historyDetailTask.imageSignedUrl"
                 :src="historyDetailTask.imageSignedUrl"
+                :preview-src-list="[historyDetailTask.imageSignedUrl]"
                 fit="contain"
                 style="width: 100%; height: 300px"
                 preview-teleported
@@ -431,6 +438,7 @@ watch(detailVisible, (isVisible) => {
               <el-image
                 v-if="historyDetailTask.processedImageSignedUrl"
                 :src="historyDetailTask.processedImageSignedUrl"
+                :preview-src-list="[historyDetailTask.processedImageSignedUrl]"
                 fit="contain"
                 style="width: 100%; height: 300px"
                 preview-teleported

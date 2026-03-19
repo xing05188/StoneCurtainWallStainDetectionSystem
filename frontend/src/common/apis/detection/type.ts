@@ -21,6 +21,7 @@ export interface DetectionTaskItem {
   status: DetectionStatus
   createdAt: string
   updatedAt: string
+  imageName?: string | null
   imagePath?: string | null
   imageSignedUrl?: string | null
   processedImagePath?: string | null

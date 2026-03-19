@@ -30,6 +30,7 @@ class DetectionTaskItem(BaseModel):
     status: DetectionStatus
     createdAt: datetime
     updatedAt: datetime
+    imageName: str | None = None
     imagePath: str | None = None
     imageSignedUrl: str | None = None
     processedImagePath: str | None = None

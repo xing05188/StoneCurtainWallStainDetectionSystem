@@ -325,8 +325,11 @@ onBeforeUnmount(() => {
 
           <div v-if="detectionStore.currentTask" class="result-content">
             <el-descriptions :column="2" border size="small">
-              <el-descriptions-item label="任务ID" :span="2">
+              <el-descriptions-item label="任务ID">
                 {{ detectionStore.currentTask.id }}
+              </el-descriptions-item>
+              <el-descriptions-item label="图片名称">
+                {{ detectionStore.currentTask.imageName || "-" }}
               </el-descriptions-item>
               <el-descriptions-item label="状态">
                 <el-tag
@@ -406,6 +409,7 @@ onBeforeUnmount(() => {
                   <el-image
                     v-if="detectionStore.currentTask.imageSignedUrl"
                     :src="detectionStore.currentTask.imageSignedUrl"
+                    :preview-src-list="[detectionStore.currentTask.imageSignedUrl]"
                     fit="contain"
                     style="width: 100%; height: 300px"
                     preview-teleported
@@ -417,6 +421,7 @@ onBeforeUnmount(() => {
                   <el-image
                     v-if="detectionStore.currentTask.processedImageSignedUrl"
                     :src="detectionStore.currentTask.processedImageSignedUrl"
+                    :preview-src-list="[detectionStore.currentTask.processedImageSignedUrl]"
                     fit="contain"
                     style="width: 100%; height: 300px"
                     preview-teleported
