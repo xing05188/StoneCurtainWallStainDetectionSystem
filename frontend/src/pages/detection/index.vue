@@ -16,6 +16,10 @@ const uploadFileListRef = ref<any>(null)
 const batchUploadLoading = ref(false)
 const currentBatchUploadIndex = ref(0)
 
+function getInferenceModeLabel(mode?: Detection.InferenceMode) {
+  return mode === "cloud" ? "云端模型" : "本地模型"
+}
+
 // 批量上传队列
 const filesToProcess = ref<File[]>([])
 const currentFileIndex = ref(0)
@@ -100,7 +104,10 @@ function handleNamingConfirm(data: { customName: string; formData: Detection.Cre
     file: currentFile.value,
     customName: data.customName,
     imagePreview: currentFilePreview.value,
-    formData: data.formData
+    formData: {
+      ...data.formData,
+      inferenceMode: "local" as Detection.InferenceMode
+    }
   }
   addToQueue(queueItem)
 
@@ -187,6 +194,18 @@ async function uploadAll() {
 // 上传单个项（来自队列）
 async function handleUploadQueueItem(item: any) {
   await uploadQueueItem(item)
+}
+
+function handleUpdateInferenceMode(payload: { id: string; mode: Detection.InferenceMode }) {
+  const current = queue.value.find((item: any) => item.id === payload.id)
+  if (!current) return
+
+  updateQueueItem(payload.id, {
+    formData: {
+      ...current.formData,
+      inferenceMode: payload.mode
+    }
+  })
 }
 
 // 移除队列项
@@ -291,6 +310,7 @@ onBeforeUnmount(() => {
             @uploadAll="uploadAll"
             @clearCompleted="clearCompletedItems"
             @viewResult="handleViewResult"
+            @updateInferenceMode="handleUpdateInferenceMode"
           />
         </el-card>
       </div>
@@ -338,6 +358,9 @@ onBeforeUnmount(() => {
                 >
                   {{ detectionStore.currentTask.status }}
                 </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="推理模式">
+                {{ getInferenceModeLabel(detectionStore.currentTask.metrics?.inferenceMode) }}
               </el-descriptions-item>
 
               <el-descriptions-item label="建筑">

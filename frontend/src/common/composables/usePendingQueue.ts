@@ -1,4 +1,5 @@
 import type { Ref } from "vue"
+import type { InferenceMode } from "@/common/apis/detection/type"
 
 export interface PendingQueueItem {
   id: string
@@ -12,6 +13,7 @@ export interface PendingQueueItem {
     locationFloor?: number
     locationSection?: string
     description?: string
+    inferenceMode?: InferenceMode
   }
   uploadProgress: number
   status: "pending" | "uploading" | "done" | "failed"

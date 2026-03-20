@@ -24,6 +24,7 @@ export function createDetectionTaskApi(
   if (payload.description) {
     data.append("description", payload.description)
   }
+  data.append("inference_mode", payload.inferenceMode || "local")
 
   return request<Detection.DetectionTaskItem>({
     url: "detections",

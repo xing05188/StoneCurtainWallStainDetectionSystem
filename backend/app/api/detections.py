@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, Uplo
 from app.core.auth import get_current_user_id
 from app.core.config import settings
 from app.core.response import fail, ok
-from app.services.model_adapter import detect_image_sync
+from app.services.model_adapter import InferenceMode, detect_image_sync
 from app.services.supabase_repo import SupabaseRepository
 from app.workers.tasks import process_detection_task, process_detection_task_from_storage
 
@@ -27,7 +27,8 @@ async def create_detection(
     building_name: str = Form(...),
     location_floor: int | None = Form(None),
     location_section: str | None = Form(None),
-    description: str | None = Form(None)
+    description: str | None = Form(None),
+    inference_mode: InferenceMode = Form("local")
 ) -> dict:
     if image.content_type not in ("image/jpeg", "image/png", "image/jpg"):
         return {
@@ -66,7 +67,7 @@ async def create_detection(
 
         if len(image_bytes) <= settings.sync_size_threshold_bytes:
             repo.update_detection_processing(task_id)
-            model_result = detect_image_sync(image_bytes, image.content_type)
+            model_result = detect_image_sync(image_bytes, image.content_type, inference_mode)
             repo.update_detection_done(task_id, {
                 "stain_detected": model_result.stain_detected,
                 "stain_type": model_result.stain_type,
@@ -74,6 +75,7 @@ async def create_detection(
                 "summary": model_result.summary,
                 "runtime_ms": model_result.runtime_ms,
                 "overall_cleanliness": model_result.overall_cleanliness,
+                "inference_mode": inference_mode,
                 "processed_image_bytes": model_result.processed_image_bytes,
                 "processed_image_content_type": model_result.processed_image_content_type,
                 "regions": [
@@ -86,7 +88,7 @@ async def create_detection(
                 ]
             })
         else:
-            background_tasks.add_task(process_detection_task, task_id, image_bytes, image.content_type)
+            background_tasks.add_task(process_detection_task, task_id, image_bytes, image.content_type, inference_mode)
 
         return ok(repo.get_task_detail(task_id, user_id), "Task created")
     except Exception as error:  # noqa: BLE001
@@ -140,7 +142,8 @@ def retry_detection(
     try:
         repo.reset_to_pending(task_id, user_id)
         image_path, mime_type = repo.get_task_image_info(task_id, user_id)
-        background_tasks.add_task(process_detection_task_from_storage, task_id, image_path, mime_type)
+        inference_mode = repo.get_task_inference_mode(task_id, user_id)
+        background_tasks.add_task(process_detection_task_from_storage, task_id, image_path, mime_type, inference_mode)
         return ok({"id": task_id, "status": "pending"}, "Task requeued")
     except Exception as error:  # noqa: BLE001
         return fail(f"Retry detection failed: {error}", 500)

@@ -213,6 +213,7 @@ async function renderSingleTaskPage(task: DetectionTaskItem) {
     ["楼层", task.locationFloor],
     ["分区", task.locationSection],
     ["状态", task.status],
+    ["推理模式", (task.inferenceMode ?? task.metrics?.inferenceMode === "cloud" ? "云端模型" : "本地模型")],
     ["污渍类型", task.stainType],
     ["污渍占比", task.affectedAreaPercentage ? `${task.affectedAreaPercentage}%` : undefined],
     ["总结", task.summary],

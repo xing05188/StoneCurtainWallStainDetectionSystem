@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 import uuid
 
 from fastapi import HTTPException
 from supabase import Client, create_client
 
 from app.core.config import settings
+
+
+InferenceMode = Literal["local", "cloud"]
 
 
 class SupabaseRepository:
@@ -160,7 +164,8 @@ class SupabaseRepository:
             "summary": result["summary"],
             "metrics": {
                 "runtimeMs": result["runtime_ms"],
-                "overallCleanliness": result["overall_cleanliness"]
+                "overallCleanliness": result["overall_cleanliness"],
+                "inferenceMode": result.get("inference_mode", "local")
             },
             "processed_at": now,
             "updated_at": now
@@ -257,6 +262,17 @@ class SupabaseRepository:
             "errorMessage": task.get("error_message")
         }
 
+    def get_task_inference_mode(self, task_id: str, user_id: str) -> InferenceMode:
+        response = self.client.table("detection_results").select("metrics").eq("task_id", task_id).eq("user_id", user_id).limit(1).execute()
+        if not response.data:
+            return "local"
+
+        metrics = response.data[0].get("metrics") or {}
+        mode = metrics.get("inferenceMode")
+        if mode in ("local", "cloud"):
+            return mode
+        return "local"
+
     def get_task_image_info(self, task_id: str, user_id: str) -> tuple[str, str]:
         response = self.client.table("task_images").select("original_image_path,mime_type").eq("task_id", task_id).eq("user_id", user_id).limit(1).execute()
         if not response.data:
@@ -298,6 +314,7 @@ class SupabaseRepository:
         response = query.order("created_at", desc=True).order("id", desc=True).range(start, end).execute()
 
         task_rows = response.data or []
+        metric_map: dict[str, dict | None] = {}
         image_name_map: dict[str, str | None] = {}
         for row in task_rows:
             task_id = row["id"]
@@ -307,6 +324,12 @@ class SupabaseRepository:
             except Exception:  # noqa: BLE001
                 # 兼容尚未迁移 image_name 列的环境
                 image_name_map[str(task_id)] = None
+
+            try:
+                metric_row = self.client.table("detection_results").select("metrics").eq("user_id", user_id).eq("task_id", task_id).limit(1).execute()
+                metric_map[str(task_id)] = metric_row.data[0].get("metrics") if metric_row.data else None
+            except Exception:  # noqa: BLE001
+                metric_map[str(task_id)] = None
 
         items = [
             {
@@ -329,7 +352,7 @@ class SupabaseRepository:
                 "stainType": task.get("stain_type"),
                 "affectedAreaPercentage": task.get("affected_area_percentage"),
                 "regions": [],
-                "metrics": None,
+                "metrics": metric_map.get(str(task["id"])),
                 "errorMessage": task.get("error_message")
             }
             for task in task_rows

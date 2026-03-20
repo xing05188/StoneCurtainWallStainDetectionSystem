@@ -18,6 +18,7 @@ class DetectionRegion(BaseModel):
 class DetectionMetrics(BaseModel):
     runtimeMs: int | None = None
     overallCleanliness: float | None = None
+    inferenceMode: Literal["local", "cloud"] | None = None
 
 
 class DetectionTaskItem(BaseModel):

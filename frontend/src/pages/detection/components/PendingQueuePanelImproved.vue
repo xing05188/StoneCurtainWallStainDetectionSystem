@@ -12,6 +12,7 @@ interface Emits {
   (e: "uploadAll"): void
   (e: "clearCompleted"): void
   (e: "viewResult", taskId: string): void
+  (e: "updateInferenceMode", payload: { id: string, mode: "local" | "cloud" }): void
 }
 
 const props = defineProps<Props>()
@@ -114,6 +115,10 @@ function handleViewResult(taskId: string) {
   emits("viewResult", taskId)
 }
 
+function handleInferenceModeChange(id: string, mode: "local" | "cloud") {
+  emits("updateInferenceMode", { id, mode })
+}
+
 function isAllSelected() {
   return paginatedQueue.value.length > 0 && paginatedQueue.value.every(item => selectedIds.value.includes(item.id))
 }
@@ -212,6 +217,19 @@ function toggleSelectAll() {
               第{{ item.formData.locationFloor }}层
             </span>
             <span class="meta-item">{{ item.fileSize ? (item.fileSize / 1024 / 1024).toFixed(2) : '0' }} MB</span>
+          </div>
+          <div class="info-mode-row">
+            <span class="mode-label">模型</span>
+            <el-select
+              :model-value="item.formData.inferenceMode || 'local'"
+              size="small"
+              style="width: 170px"
+              :disabled="item.status === 'uploading' || item.status === 'done'"
+              @update:model-value="(value) => handleInferenceModeChange(item.id, value as 'local' | 'cloud')"
+            >
+              <el-option label="本地模型" value="local" />
+              <el-option label="云端模型" value="cloud" />
+            </el-select>
           </div>
           <div class="info-progress" v-if="item.status === 'uploading'">
             <el-progress :percentage="item.uploadProgress" size="small" />
@@ -417,6 +435,18 @@ function toggleSelectAll() {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.info-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.mode-label {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }

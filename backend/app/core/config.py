@@ -29,6 +29,11 @@ class Settings:
     sync_size_threshold_bytes: int = int(os.getenv("SYNC_SIZE_THRESHOLD_BYTES", "2097152"))
     yolo_model_path: str = os.getenv("YOLO_MODEL_PATH", "models/best.pt")
     yolo_confidence_threshold: float = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.25"))
+    cloud_model_url: str = os.getenv("CLOUD_MODEL_URL", "")
+    cloud_model_api_key: str = os.getenv("CLOUD_MODEL_API_KEY", "")
+    cloud_model_iou_threshold: float = float(os.getenv("CLOUD_MODEL_IOU_THRESHOLD", "0.7"))
+    cloud_model_imgsz: int = int(os.getenv("CLOUD_MODEL_IMGSZ", "640"))
+    cloud_model_timeout_seconds: int = int(os.getenv("CLOUD_MODEL_TIMEOUT_SECONDS", "60"))
 
 
 settings = Settings()

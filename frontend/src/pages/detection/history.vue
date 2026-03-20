@@ -65,6 +65,10 @@ const statusOptions: Array<{ label: string, value: "" | DetectionStatus }> = [
   { label: "失败", value: "failed" }
 ]
 
+function getInferenceModeLabel(mode?: Detection.InferenceMode) {
+  return mode === "cloud" ? "云端模型" : "本地模型"
+}
+
 async function fetchList(useCache = true) {
   // 检查缓存
   if (useCache) {
@@ -302,6 +306,11 @@ watch(detailVisible, (isVisible) => {
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="推理模式" width="120">
+          <template #default="scope">
+            {{ getInferenceModeLabel(scope.row.metrics?.inferenceMode) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="summary" label="总结" min-width="220" show-overflow-tooltip />
         <el-table-column prop="affectedAreaPercentage" label="污渍占比" width="100">
           <template #default="scope">
@@ -356,6 +365,9 @@ watch(detailVisible, (isVisible) => {
             >
               {{ historyDetailTask.status }}
             </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="推理模式">
+            {{ getInferenceModeLabel(historyDetailTask.metrics?.inferenceMode) }}
           </el-descriptions-item>
           <el-descriptions-item label="建筑">
             {{ historyDetailTask.buildingName }}

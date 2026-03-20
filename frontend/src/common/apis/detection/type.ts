@@ -1,4 +1,5 @@
 export type DetectionStatus = "pending" | "processing" | "done" | "failed"
+export type InferenceMode = "local" | "cloud"
 
 export interface DetectionRegion {
   label: string
@@ -9,6 +10,7 @@ export interface DetectionRegion {
 export interface DetectionMetrics {
   runtimeMs?: number
   overallCleanliness?: number
+  inferenceMode?: InferenceMode
 }
 
 export interface DetectionTaskItem {
@@ -30,6 +32,7 @@ export interface DetectionTaskItem {
   stainDetected?: boolean | null
   stainType?: string | null
   affectedAreaPercentage?: number | null
+  inferenceMode?: InferenceMode
   regions?: DetectionRegion[]
   metrics?: DetectionMetrics | null
   errorMessage?: string | null
@@ -40,6 +43,7 @@ export interface CreateDetectionPayload {
   locationFloor?: number
   locationSection?: string
   description?: string
+  inferenceMode?: InferenceMode
 }
 
 export interface DetectionListQuery {
