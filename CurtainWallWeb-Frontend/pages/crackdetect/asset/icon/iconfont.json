@@ -1,0 +1,30 @@
+{
+  "id": "4892109",
+  "name": "crack-detection",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "13184101",
+      "name": "circle-check-filled",
+      "font_class": "circle-check-filled",
+      "unicode": "e61c",
+      "unicode_decimal": 58908
+    },
+    {
+      "icon_id": "1404747",
+      "name": "circle",
+      "font_class": "circle",
+      "unicode": "e611",
+      "unicode_decimal": 58897
+    },
+    {
+      "icon_id": "10147101",
+      "name": "circle",
+      "font_class": "circle1",
+      "unicode": "e615",
+      "unicode_decimal": 58901
+    }
+  ]
+}
